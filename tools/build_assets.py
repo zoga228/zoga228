@@ -1,6 +1,13 @@
-"""Build the profile's original, dependency-free SVG artwork."""
+"""Build self-contained SVG artwork with Space Grotesk and Inter outlines."""
+from functools import lru_cache
+import hashlib
 from html import escape
+import json
 from pathlib import Path
+from urllib.request import urlopen
+
+from fontTools.pens.svgPathPen import SVGPathPen
+from fontTools.ttLib import TTFont
 
 ASSETS = Path(__file__).resolve().parents[1] / "assets"
 ASSETS.mkdir(exist_ok=True)
@@ -9,13 +16,53 @@ FG = "#f1f4ed"
 MUTED = "#a6b9bd"
 MINT = "#99e4cb"
 VIOLET = "#c2b6f7"
-FONT = "Segoe UI,Arial,sans-serif"
-MONO = "Consolas,monospace"
+DISPLAY = "Space Grotesk"
+FONT = "Inter"
+# Small labels share the same body typeface: exactly two font families.
+MONO = FONT
+FONTS = Path(__file__).resolve().parent / "fonts"
 
 
-def text(x, y, value, size=20, color=FG, weight=400, font=FONT, spacing=None):
-    tracking = f' letter-spacing="{spacing}"' if spacing is not None else ""
-    return f'<text x="{x}" y="{y}" fill="{color}" font-family="{font}" font-size="{size}" font-weight="{weight}"{tracking}>{escape(value)}</text>'
+@lru_cache(maxsize=2)
+def load_font(family):
+    manifest = json.loads((FONTS / "manifest.json").read_text(encoding="utf-8"))
+    entry = manifest["families"][family]
+    path = FONTS / entry["filename"]
+    if not path.exists():
+        with urlopen(entry["url"], timeout=60) as response:
+            data = response.read()
+        if hashlib.sha256(data).hexdigest() != entry["sha256"]:
+            raise ValueError("Downloaded font does not match its pinned SHA-256")
+        path.write_bytes(data)
+    if hashlib.sha256(path.read_bytes()).hexdigest() != entry["sha256"]:
+        raise ValueError("Font does not match its pinned SHA-256")
+    return TTFont(path)
+
+
+@lru_cache(maxsize=16)
+def glyph_set(family, weight):
+    return load_font(family).getGlyphSet(location={"wght": weight, "opsz": 14})
+
+
+def text(x, y, value, size=20, color=FG, weight=400, font=None, spacing=None):
+    family = font or (DISPLAY if size >= 29 else FONT)
+    source_font = load_font(family)
+    glyphs = glyph_set(family, weight)
+    mapping = source_font.getBestCmap()
+    scale = size / source_font["head"].unitsPerEm
+    advance = 0
+    parts = []
+    for character in value:
+        name = mapping.get(ord(character))
+        if name is None:
+            raise ValueError(f"Missing glyph in {family}: {character!r}")
+        glyph = glyphs[name]
+        pen = SVGPathPen(glyphs, ntos=lambda number: format(number, ".3f"))
+        glyph.draw(pen)
+        if commands := pen.getCommands():
+            parts.append(f'<path transform="translate({x+advance:.3f} {y}) scale({scale:.6f} {-scale:.6f})" d="{commands}"/>')
+        advance += glyph.width * scale + (spacing or 0)
+    return f'<g fill="{color}" data-typeface="{family}" aria-label="{escape(value, quote=True)}">' + "".join(parts) + "</g>"
 
 
 def line(x1, y1, x2, y2, color="#253642", width=1, opacity=1):
@@ -24,7 +71,8 @@ def line(x1, y1, x2, y2, color="#253642", width=1, opacity=1):
 
 def svg(name, width, height, label, body):
     defs = '<defs><linearGradient id="bg" x2="1" y2="1"><stop stop-color="#0d141e"/><stop offset="1" stop-color="#14272b"/></linearGradient><radialGradient id="glow"><stop stop-color="#65b99f" stop-opacity=".17"/><stop offset="1" stop-color="#65b99f" stop-opacity="0"/></radialGradient></defs>'
-    source = f'<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}" role="img" aria-labelledby="title"><title id="title">{escape(label)}</title>{defs}{body}</svg>\n'
+    credits = '<metadata>Typography: Space Grotesk and Inter, SIL Open Font License 1.1. Sources, pinned hashes and licenses: tools/fonts/. Text is outlined for consistent rendering.</metadata>'
+    source = f'<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}" role="img" aria-labelledby="title"><title id="title">{escape(label)}</title>{credits}{defs}{body}</svg>\n'
     (ASSETS / name).write_text(source, encoding="utf-8")
 
 
@@ -48,11 +96,11 @@ def header():
     for y in range(54, 334, 40):
         b += line(716, y, 1176, y, opacity=.35)
     b += '<rect x="48" y="40" width="36" height="36" rx="10" fill="#99e4cb"/>'
-    b += text(58, 65, "Z", 23, BG, 700)
+    b += text(58, 65, "Z", 23, BG, 700, font=DISPLAY)
     b += text(101, 64, "ZOGA228 / ML PORTFOLIO", 14, MUTED, font=MONO, spacing=1)
     b += text(48, 164, "Zangar.", 84, FG, 700, spacing=-3)
-    b += text(51, 224, "Building models.", 34, FG, 500)
-    b += text(51, 267, "Questioning results.", 34, MINT, 500)
+    b += text(51, 224, "Building models.", 34, FG, 500, font=DISPLAY)
+    b += text(51, 267, "Questioning results.", 34, MINT, 500, font=DISPLAY)
     b += text(52, 307, "Language models · Reliable evaluation · AI prototypes", 18, MUTED)
     # A stylized decoder: a conceptual illustration, not an empirical chart.
     layers = [[(800, y) for y in (135, 185, 235)], [(882, y) for y in (110, 160, 210, 260)], [(964, y) for y in (110, 160, 210, 260)], [(1046, y) for y in (135, 185, 235)]]
