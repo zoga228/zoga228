@@ -180,7 +180,7 @@ def project(name, number, title, subtitle, detail, tags, icon):
 
 
 def buttons():
-    for name, label, width, accent in [("huggingface.svg", "Hugging Face / weights", 258, MINT), ("kaggle.svg", "Kaggle / notebooks", 235, VIOLET), ("repositories.svg", "GitHub / repositories", 251, FG)]:
+    for name, label, width, accent in [("huggingface.svg", "Hugging Face / weights", 258, MINT), ("kaggle.svg", "Kaggle / notebooks", 235, VIOLET), ("linkedin.svg", "LinkedIn / connect", 204, MINT), ("repositories.svg", "GitHub / repositories", 251, FG)]:
         b = f'<rect x=".5" y=".5" width="{width-1}" height="43" rx="10" fill="{BG}" stroke="#34454e"/>'
         b += f'<circle cx="18" cy="22" r="3" fill="{accent}"/>'
         b += text(31, 28, label, 15, accent, 500)

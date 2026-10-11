@@ -12,6 +12,7 @@
 <p align="center">
   <a href="https://huggingface.co/Zangeeeeerange"><img src="assets/huggingface.svg" width="215" alt="Hugging Face — released model weights" /></a>
   <a href="https://www.kaggle.com/zangar09417"><img src="assets/kaggle.svg" width="196" alt="Kaggle — notebooks and competitions" /></a>
+  <a href="https://www.linkedin.com/in/zanggar/"><img src="assets/linkedin.svg" width="170" alt="Connect with Zangar on LinkedIn" /></a>
   <a href="https://github.com/zoga228?tab=repositories"><img src="assets/repositories.svg" width="209" alt="Browse GitHub repositories" /></a>
 </p>
 
